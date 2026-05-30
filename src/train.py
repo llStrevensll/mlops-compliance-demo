@@ -34,6 +34,10 @@ from xgboost import XGBClassifier
 # Configuración
 # ------------------------------------------------------------------
 RUTA_DATOS = "data/compliance_findings.csv"
+# Backend local de MLflow (SQLite). Fijarlo explícitamente garantiza que los
+# experimentos, runs y el registry SIEMPRE queden en mlflow.db, y que la UI
+# (mlflow ui --backend-store-uri sqlite:///mlflow.db) lea exactamente lo mismo.
+MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 EXPERIMENTO = "compliance-risk"             # nombre del experimento en MLflow
 NOMBRE_MODELO_REGISTRO = "compliance-risk-model"  # nombre en el Model Registry
 SEED = 42                                   # semilla fija -> resultados reproducibles
@@ -87,6 +91,8 @@ def main() -> None:
         "eval_metric": "logloss",
     }
 
+    # Fijamos el backend (SQLite) ANTES de crear el experimento.
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     # Le decimos a MLflow en qué "experimento" agrupar esta corrida.
     mlflow.set_experiment(EXPERIMENTO)
 
