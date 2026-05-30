@@ -40,7 +40,24 @@ DEPARTAMENTOS = ["Finance", "IT", "HR", "Operations", "Legal"]
 # 2) Generar las FEATURES (las "pistas" que el modelo usará)
 # ------------------------------------------------------------------
 def generar_features(n: int) -> pd.DataFrame:
-    """Crea un DataFrame con n filas de features sintéticas."""
+    """Crea un DataFrame con n filas de features sintéticas.
+
+    --- Desglose de la SINTAXIS de la firma (la primera línea) ---
+        def                -> palabra clave que DEFINE una función.
+        generar_features   -> nombre de la función (cómo la llamamos).
+        (n: int)           -> recibe un parámetro 'n'. El ': int' es un
+                              'type hint' (pista de tipo): indica que 'n'
+                              debería ser un entero. Python NO lo obliga en
+                              tiempo de ejecución, pero ayuda a:
+                                • legibilidad (otro dev entiende qué espera)
+                                • autocompletado del editor (VS Code, PyCharm)
+                                • detectar errores con herramientas (mypy, ruff)
+        -> pd.DataFrame    -> 'return type hint': dice que la función DEVUELVE
+                              un pandas DataFrame (una tabla). Es informativo,
+                              no obligatorio, pero documenta el contrato.
+
+    En resumen: "esta función recibe un entero n y devuelve una tabla".
+    """
     datos = {
         # severity: gravedad de 1 a 5. randint(1, 6) genera enteros 1..5
         "severity": rng.integers(1, 6, size=n),
