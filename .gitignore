@@ -1,0 +1,44 @@
+# ============================================================
+#  .gitignore  —  qué archivos NO se suben a GitHub
+#  Regla de oro: nunca subir secretos, credenciales ni datos.
+# ============================================================
+
+# --- Python: archivos generados automáticamente ---
+__pycache__/        # cachés de bytecode de Python
+*.py[oc]            # archivos compilados .pyc / .pyo
+build/              # artefactos de build
+dist/               # paquetes distribuibles
+wheels/             # paquetes wheel
+*.egg-info          # metadata de paquetes
+
+# --- Entornos virtuales (los recrea uv, no se versionan) ---
+.venv               # entorno virtual de uv
+
+# --- SECRETOS Y CREDENCIALES (¡NUNCA subir!) ---
+.env                # variables de entorno (passwords, tokens)
+.env.*              # variantes (.env.local, .env.prod)
+*.pem               # llaves privadas
+*.key               # llaves
+credentials*        # cualquier archivo de credenciales
+.aws/               # credenciales AWS por si acaso
+
+# --- Artefactos de MLflow (modelos/experimentos locales) ---
+mlruns/             # carpeta donde MLflow guarda experimentos localmente
+mlartifacts/        # artefactos de modelos
+*.db                # bases SQLite locales (ej. backend de MLflow)
+
+# --- Modelos entrenados (pesados, no van a git) ---
+*.pkl               # modelos serializados con pickle
+*.joblib            # modelos serializados con joblib
+*.bin               # binarios de modelos (ej. XGBoost)
+models/             # carpeta de modelos exportados
+
+# --- Datos (no subimos datasets) ---
+data/*.csv          # datasets en csv
+data/*.parquet      # datasets en parquet
+!data/.gitkeep      # excepción: sí mantenemos la carpeta vacía
+
+# --- Sistema operativo / editor ---
+.DS_Store           # archivo de macOS
+.idea/              # config de PyCharm
+.vscode/            # config de VS Code

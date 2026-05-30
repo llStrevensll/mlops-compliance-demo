@@ -1,0 +1,7 @@
+[project]
+name = "mlops-compliance"
+version = "0.1.0"
+description = "End-to-end MLOps demo: compliance-risk scoring with MLflow, BentoML, Kubernetes and CI/CD"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
