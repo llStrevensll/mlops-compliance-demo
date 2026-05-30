@@ -9,6 +9,8 @@ automated retraining via CI/CD, and drift monitoring with observability dashboar
 
 ## Architecture
 
+> 📐 Detailed diagram (rendered) and component breakdown in [`docs/architecture.md`](docs/architecture.md).
+
 ```
 GitHub Actions (CI/CD) ── train → evaluate → quality gate → register
                                       │
