@@ -4,4 +4,7 @@ version = "0.1.0"
 description = "End-to-end MLOps demo: compliance-risk scoring with MLflow, BentoML, Kubernetes and CI/CD"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "numpy>=2.4.6",
+    "pandas>=3.0.3",
+]

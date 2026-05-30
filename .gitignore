@@ -1,44 +1,47 @@
 # ============================================================
 #  .gitignore  —  qué archivos NO se suben a GitHub
 #  Regla de oro: nunca subir secretos, credenciales ni datos.
+#  NOTA: git solo reconoce comentarios cuando '#' va al INICIO
+#  de la línea. Por eso cada comentario va en su propia línea.
 # ============================================================
 
 # --- Python: archivos generados automáticamente ---
-__pycache__/        # cachés de bytecode de Python
-*.py[oc]            # archivos compilados .pyc / .pyo
-build/              # artefactos de build
-dist/               # paquetes distribuibles
-wheels/             # paquetes wheel
-*.egg-info          # metadata de paquetes
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
 
 # --- Entornos virtuales (los recrea uv, no se versionan) ---
-.venv               # entorno virtual de uv
+.venv
 
-# --- SECRETOS Y CREDENCIALES (¡NUNCA subir!) ---
-.env                # variables de entorno (passwords, tokens)
-.env.*              # variantes (.env.local, .env.prod)
-*.pem               # llaves privadas
-*.key               # llaves
-credentials*        # cualquier archivo de credenciales
-.aws/               # credenciales AWS por si acaso
+# --- SECRETOS Y CREDENCIALES (NUNCA subir) ---
+.env
+.env.*
+*.pem
+*.key
+credentials*
+.aws/
 
 # --- Artefactos de MLflow (modelos/experimentos locales) ---
-mlruns/             # carpeta donde MLflow guarda experimentos localmente
-mlartifacts/        # artefactos de modelos
-*.db                # bases SQLite locales (ej. backend de MLflow)
+mlruns/
+mlartifacts/
+*.db
 
 # --- Modelos entrenados (pesados, no van a git) ---
-*.pkl               # modelos serializados con pickle
-*.joblib            # modelos serializados con joblib
-*.bin               # binarios de modelos (ej. XGBoost)
-models/             # carpeta de modelos exportados
+*.pkl
+*.joblib
+*.bin
+models/
 
 # --- Datos (no subimos datasets) ---
-data/*.csv          # datasets en csv
-data/*.parquet      # datasets en parquet
-!data/.gitkeep      # excepción: sí mantenemos la carpeta vacía
+data/*.csv
+data/*.parquet
+# Excepción: sí conservamos la carpeta vacía con su .gitkeep
+!data/.gitkeep
 
 # --- Sistema operativo / editor ---
-.DS_Store           # archivo de macOS
-.idea/              # config de PyCharm
-.vscode/            # config de VS Code
+.DS_Store
+.idea/
+.vscode/
