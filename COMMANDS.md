@@ -51,6 +51,33 @@ In the UI you can see:
 - The `compliance-risk` **experiment** and each run (params + metrics).
 - The **Models** tab with `compliance-risk-model` and its versions.
 
+## 4. Serve the model as a REST API (BentoML)
+
+```bash
+# 4.1 Import the registered MLflow model into the BentoML model store (once per new version)
+uv run python src/import_model.py
+
+# 4.2 Start the API server (port 3000 is taken by Docker here, so we use 7777)
+uv run bentoml serve service:ComplianceRiskService --port 7777
+```
+
+Test it with `curl`:
+
+```bash
+curl -X POST http://localhost:7777/predict \
+  -H "Content-Type: application/json" \
+  -d '{"finding": {"severity":5,"days_open":120,"control_failures":4,
+       "affected_systems":6,"is_repeat_finding":1,"has_remediation_plan":0,
+       "framework":"SOC2","department":"IT"}}'
+# -> {"risk_high": 1, "risk_label": "HIGH"}
+```
+
+| | |
+|---|---|
+| What it does | Loads the model and exposes `POST /predict` (raw finding in, risk out). |
+| Model source | BentoML model store (`compliance_risk:latest`), imported from MLflow. |
+| Interactive docs | Open <http://localhost:7777> for the auto-generated Swagger UI. |
+
 ## Where things live (summary)
 
 | Path | Content | Versioned in git? |
