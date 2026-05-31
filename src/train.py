@@ -1,25 +1,26 @@
 """
 train.py
 ========
-Entrena un modelo de clasificación (XGBoost) que predice si un hallazgo de
-compliance es de riesgo ALTO (1) o BAJO (0), y registra TODO en MLflow.
+Entrena un modelo de clasificación que predice si un hallazgo de compliance
+es de riesgo ALTO (1) o BAJO (0), y registra TODO en MLflow.
 
-¿Qué es MLflow y por qué lo usamos?
-  - Tracking: guarda cada entrenamiento (parámetros, métricas, el modelo).
-    Es como el "git log" de tus experimentos -> reproducibilidad.
-  - Model Registry: versiona los modelos (v1, v2...) para saber cuál usar
-    en producción y poder volver atrás.
+CLAVE: el modelo es un **Pipeline de scikit-learn** que incluye DENTRO el
+preprocesamiento (one-hot encoding) + el clasificador (XGBoost). Así el
+preprocesamiento "viaja con el modelo" y al servir le podemos mandar datos
+CRUDOS sin riesgo de 'training/serving skew' (que el encoding difiera entre
+entrenamiento y producción).
 
 Uso:
     uv run python src/train.py
-Luego, para ver los resultados en el navegador:
-    uv run mlflow ui   ->  abrir http://localhost:5000
+Ver resultados:
+    uv run mlflow ui --backend-store-uri sqlite:///mlflow.db  ->  http://localhost:5000
 """
 
 import mlflow
-import mlflow.xgboost                       # "flavor" de MLflow para modelos XGBoost
+import mlflow.sklearn                       # flavor para guardar Pipelines de sklearn
 import pandas as pd
-from mlflow.models import infer_signature   # deduce el "contrato" entrada/salida del modelo
+from mlflow.models import infer_signature
+from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -28,6 +29,8 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 from xgboost import XGBClassifier
 
 # ------------------------------------------------------------------
@@ -38,109 +41,127 @@ RUTA_DATOS = "data/compliance_findings.csv"
 # experimentos, runs y el registry SIEMPRE queden en mlflow.db, y que la UI
 # (mlflow ui --backend-store-uri sqlite:///mlflow.db) lea exactamente lo mismo.
 MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
-EXPERIMENTO = "compliance-risk"             # nombre del experimento en MLflow
-NOMBRE_MODELO_REGISTRO = "compliance-risk-model"  # nombre en el Model Registry
-SEED = 42                                   # semilla fija -> resultados reproducibles
+EXPERIMENTO = "compliance-risk"
+NOMBRE_MODELO_REGISTRO = "compliance-risk-model"
+SEED = 42
 
-# Columnas de texto que hay que convertir a números (el modelo no entiende texto)
-COLUMNAS_CATEGORICAS = ["framework", "department"]
-COLUMNA_OBJETIVO = "risk_high"              # lo que queremos predecir (label)
+# Separamos las columnas por tipo: el Pipeline tratará distinto a cada grupo.
+COLUMNAS_CATEGORICAS = ["framework", "department"]   # texto -> hay que codificar
+COLUMNAS_NUMERICAS = [                                 # ya son números -> pasan tal cual
+    "severity",
+    "days_open",
+    "control_failures",
+    "affected_systems",
+    "is_repeat_finding",
+    "has_remediation_plan",
+]
+COLUMNA_OBJETIVO = "risk_high"
 
 
 # ------------------------------------------------------------------
-# 1) Cargar y preparar los datos
+# 1) Cargar datos (CRUDOS: las categóricas quedan como texto)
 # ------------------------------------------------------------------
-def cargar_y_preparar() -> tuple[pd.DataFrame, pd.Series]:
-    """
-    Lee el CSV, convierte las columnas de texto a números (one-hot encoding)
-    y separa las features (X) del objetivo (y).
-    Devuelve: (X, y)
+def cargar_datos() -> tuple[pd.DataFrame, pd.Series]:
+    """Lee el CSV y separa features (X, crudas) del objetivo (y).
+
+    Ojo: aquí NO codificamos nada. El one-hot encoding lo hará el Pipeline,
+    para que el mismo preprocesamiento se aplique tanto al entrenar como al servir.
     """
     df = pd.read_csv(RUTA_DATOS)
-
-    # one-hot encoding: cada categoría de texto se vuelve una columna 0/1.
-    # Ej: 'framework' -> framework_SOC2, framework_GDPR, ... (con 0 o 1).
-    # El modelo solo entiende números, por eso esta conversión es necesaria.
-    df = pd.get_dummies(df, columns=COLUMNAS_CATEGORICAS)
-
-    # X = todas las columnas MENOS el objetivo. y = solo el objetivo.
-    X = df.drop(columns=[COLUMNA_OBJETIVO])
+    X = df.drop(columns=[COLUMNA_OBJETIVO])   # incluye framework/department como texto
     y = df[COLUMNA_OBJETIVO]
     return X, y
 
 
 # ------------------------------------------------------------------
-# 2) Entrenar + evaluar + registrar en MLflow
+# 2) Construir el Pipeline (preprocesamiento + modelo en un solo objeto)
+# ------------------------------------------------------------------
+def construir_pipeline(params: dict) -> Pipeline:
+    """Crea un Pipeline = [ preprocesador -> clasificador ].
+
+    - ColumnTransformer aplica OneHotEncoder SOLO a las categóricas y deja
+      pasar las numéricas tal cual (remainder='passthrough').
+    - handle_unknown='ignore': si en producción llega una categoría que no se
+      vio al entrenar, no rompe (la codifica como todo ceros).
+    """
+    preprocesador = ColumnTransformer(
+        transformers=[
+            ("cat", OneHotEncoder(handle_unknown="ignore"), COLUMNAS_CATEGORICAS),
+        ],
+        remainder="passthrough",   # las numéricas pasan sin cambios
+    )
+    return Pipeline(
+        steps=[
+            ("preprocesador", preprocesador),
+            ("clasificador", XGBClassifier(**params)),
+        ]
+    )
+
+
+# ------------------------------------------------------------------
+# 3) Entrenar + evaluar + registrar en MLflow
 # ------------------------------------------------------------------
 def main() -> None:
-    X, y = cargar_y_preparar()
+    X, y = cargar_datos()
 
-    # train_test_split: separa datos para ENTRENAR (80%) y para PROBAR (20%).
-    # 'stratify=y' mantiene la misma proporción de clases en ambos conjuntos.
+    # 80% entrenar / 20% probar. stratify mantiene la proporción de clases.
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.20, random_state=SEED, stratify=y
     )
 
-    # Hiperparámetros del modelo (las "perillas" que controlan el entrenamiento).
+    # Hiperparámetros del clasificador (las "perillas" del entrenamiento).
     params = {
-        "n_estimators": 200,        # nº de árboles
-        "max_depth": 4,             # profundidad máxima de cada árbol
-        "learning_rate": 0.1,       # qué tanto aprende en cada paso
-        "subsample": 0.9,           # % de filas usadas por árbol (evita overfitting)
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.1,
+        "subsample": 0.9,
         "random_state": SEED,
         "eval_metric": "logloss",
     }
 
-    # Fijamos el backend (SQLite) ANTES de crear el experimento.
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    # Le decimos a MLflow en qué "experimento" agrupar esta corrida.
     mlflow.set_experiment(EXPERIMENTO)
 
-    # 'start_run' inicia una corrida. Todo lo que registremos adentro queda
-    # asociado a esta corrida (params, métricas, modelo).
     with mlflow.start_run() as run:
         print(f"MLflow run id: {run.info.run_id}")
 
-        # --- Entrenar ---
-        modelo = XGBClassifier(**params)
+        # --- Entrenar el Pipeline COMPLETO (preprocesa + entrena de una) ---
+        modelo = construir_pipeline(params)
         modelo.fit(X_train, y_train)
 
-        # --- Predecir sobre el set de prueba ---
+        # --- Predecir sobre el set de prueba (le pasamos datos CRUDOS) ---
         y_pred = modelo.predict(X_test)                  # clase 0/1
         y_proba = modelo.predict_proba(X_test)[:, 1]     # probabilidad de clase 1
 
-        # --- Calcular métricas (qué tan bueno es el modelo) ---
+        # --- Métricas ---
         metricas = {
-            "accuracy": accuracy_score(y_test, y_pred),    # % de aciertos
-            "precision": precision_score(y_test, y_pred),  # de los que dijo "alto", cuántos lo eran
-            "recall": recall_score(y_test, y_pred),        # de los "alto" reales, cuántos detectó
-            "f1": f1_score(y_test, y_pred),                # balance entre precision y recall
-            "roc_auc": roc_auc_score(y_test, y_proba),     # capacidad de separar clases (0.5=azar, 1=perfecto)
+            "accuracy": accuracy_score(y_test, y_pred),
+            "precision": precision_score(y_test, y_pred),
+            "recall": recall_score(y_test, y_pred),
+            "f1": f1_score(y_test, y_pred),
+            "roc_auc": roc_auc_score(y_test, y_proba),
         }
 
-        # --- Registrar en MLflow (TRACKING) ---
-        mlflow.log_params(params)        # guarda los hiperparámetros
-        mlflow.log_metrics(metricas)     # guarda las métricas
+        # --- Registrar params y métricas ---
+        mlflow.log_params(params)
+        mlflow.log_metrics(metricas)
 
-        # 'signature' = contrato del modelo: qué columnas entran y qué sale.
-        # Sirve para validar entradas cuando lo sirvamos como API.
+        # signature = contrato del modelo. Como entrenamos con X CRUDO, el
+        # contrato dice que la API recibe columnas crudas (incluye texto).
         signature = infer_signature(X_train, modelo.predict(X_train))
 
-        # --- Guardar el modelo y REGISTRARLO en el Model Registry ---
-        # 'registered_model_name' crea/incrementa la versión en el registry.
-        mlflow.xgboost.log_model(
+        # --- Guardar el Pipeline y registrarlo en el Model Registry ---
+        mlflow.sklearn.log_model(
             modelo,
             name="model",
             signature=signature,
             registered_model_name=NOMBRE_MODELO_REGISTRO,
         )
 
-        # --- Resumen en consola ---
         print("\n=== Métricas del modelo ===")
         for nombre, valor in metricas.items():
             print(f"  {nombre:10s}: {valor:.4f}")
         print(f"\nModelo registrado como: '{NOMBRE_MODELO_REGISTRO}'")
-        print("Para ver todo: uv run mlflow ui  ->  http://localhost:5000")
 
 
 if __name__ == "__main__":
