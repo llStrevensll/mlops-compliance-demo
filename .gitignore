@@ -38,6 +38,9 @@ models/
 # --- Métricas generadas por el entrenamiento (artefacto del CI) ---
 metrics.json
 
+# --- Reportes de drift de Evidently (HTML pesado, generado) ---
+reports/
+
 # --- Datos (no subimos datasets) ---
 data/*.csv
 data/*.parquet

@@ -123,6 +123,17 @@ Teardown (free resources):
 kind delete cluster --name mlops
 ```
 
+## 7. Data-drift report (Evidently)
+
+```bash
+uv run python src/drift_report.py
+```
+
+| | |
+|---|---|
+| What it does | Compares reference data vs. simulated current (drifted) data and detects drift. |
+| Output | `reports/drift_report.html` (interactive report, git-ignored). |
+
 ## Where things live (summary)
 
 | Path | Content | Versioned in git? |
