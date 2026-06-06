@@ -1,0 +1,67 @@
+# prometheus.yaml
+# ===============
+# Prometheus recolecta (scrape) las métricas que expone el servicio del modelo
+# en /metrics, y las guarda como series de tiempo para graficarlas en Grafana.
+
+# --- ConfigMap: la configuración de Prometheus (prometheus.yml) ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s          # cada cuánto recolecta métricas
+    scrape_configs:
+      - job_name: 'compliance-risk'
+        metrics_path: /metrics
+        static_configs:
+          # 'compliance-risk:80' = el Service del modelo (DNS interno del cluster).
+          # El puerto 80 del Service enruta al 3000 del contenedor (donde está /metrics).
+          - targets: ['compliance-risk:80']
+---
+# --- Deployment: corre Prometheus ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus            # monta el ConfigMap aquí
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+---
+# --- Service: punto de acceso estable a Prometheus ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090

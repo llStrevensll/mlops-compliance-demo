@@ -1,0 +1,147 @@
+# grafana.yaml
+# ============
+# Grafana muestra las métricas de Prometheus en dashboards visuales.
+# Provisionamos automáticamente: (1) el datasource Prometheus y (2) un dashboard.
+
+# --- ConfigMap: datasource (conecta Grafana -> Prometheus) ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        uid: prometheus               # uid fijo para referenciarlo en el dashboard
+        url: http://prometheus:9090   # Service de Prometheus (DNS interno)
+        isDefault: true
+---
+# --- ConfigMap: 'provider' que le dice a Grafana dónde buscar dashboards ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+data:
+  provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards
+---
+# --- ConfigMap: el dashboard en sí (JSON) ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+data:
+  compliance-risk.json: |
+    {
+      "title": "ComplianceML - Model Serving",
+      "uid": "compliance-risk",
+      "schemaVersion": 39,
+      "time": { "from": "now-15m", "to": "now" },
+      "refresh": "5s",
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Predict request rate (req/s)",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "rate(bentoml_service_request_total{endpoint=\"/predict\"}[1m])",
+              "legendFormat": "{{http_response_code}}"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "Total /predict requests (200)",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"})"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Requests in progress",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "bentoml_service_request_in_progress{endpoint=\"/predict\"}"
+            }
+          ]
+        }
+      ]
+    }
+---
+# --- Deployment: corre Grafana ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          env:
+            # Acceso anónimo (solo lectura) para ver el dashboard sin login en el demo.
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Viewer"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+---
+# --- Service: punto de acceso a Grafana ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000

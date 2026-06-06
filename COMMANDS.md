@@ -134,6 +134,31 @@ uv run python src/drift_report.py
 | What it does | Compares reference data vs. simulated current (drifted) data and detects drift. |
 | Output | `reports/drift_report.html` (interactive report, git-ignored). |
 
+## 8. Observability: Prometheus + Grafana (on Kubernetes)
+
+The BentoML service already exposes Prometheus metrics at `/metrics`.
+
+```bash
+# Deploy Prometheus (scrapes the model service) and Grafana (dashboards)
+kubectl --context kind-mlops apply -f k8s/monitoring/
+
+kubectl --context kind-mlops wait --for=condition=ready pod -l app=prometheus --timeout=120s
+kubectl --context kind-mlops wait --for=condition=ready pod -l app=grafana --timeout=180s
+```
+
+Open the UIs (each in its own terminal):
+
+```bash
+# Grafana -> http://localhost:8088  (dashboard "ComplianceML - Model Serving")
+kubectl --context kind-mlops port-forward svc/grafana 8088:3000
+
+# Prometheus -> http://localhost:9090
+kubectl --context kind-mlops port-forward svc/prometheus 9090:9090
+```
+
+> Generate traffic first (so the dashboard has data): hit `POST /predict` a few times
+> via `kubectl port-forward svc/compliance-risk 7777:80`.
+
 ## Where things live (summary)
 
 | Path | Content | Versioned in git? |
