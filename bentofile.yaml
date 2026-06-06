@@ -1,0 +1,28 @@
+# bentofile.yaml
+# ==============
+# Describe cómo BentoML debe empaquetar el servicio en un "Bento"
+# (artefacto que incluye: código del servicio + modelo + dependencias).
+# Del Bento se genera la imagen Docker.
+
+# Punto de entrada: archivo:ClaseDelServicio
+service: "service:ComplianceRiskService"
+
+# Etiquetas informativas (metadata)
+labels:
+  owner: angel-rodriguez
+  project: mlops-compliance
+
+# Qué archivos del proyecto incluir dentro del Bento
+include:
+  - "service.py"
+
+# Dependencias de Python que se instalarán dentro de la imagen.
+# Solo lo necesario para SERVIR el modelo (no incluimos cosas de entrenamiento
+# como las herramientas de desarrollo) -> imagen más liviana.
+python:
+  packages:
+    - mlflow>=2.18        # para cargar el modelo (flavor mlflow)
+    - scikit-learn>=1.8.0 # el Pipeline usa sklearn
+    - xgboost>=3.2.0      # el clasificador
+    - pandas>=2.0,<3      # manejo de la tabla de entrada
+    - numpy>=1.26,<2.3    # dependencia numérica

@@ -1,0 +1,20 @@
+# service.yaml
+# ============
+# Un Service de Kubernetes da una "puerta de entrada" estable a los pods.
+# Los pods pueden morir/recrearse (cambian de IP), pero el Service mantiene
+# un punto de acceso fijo y reparte el tráfico entre las réplicas.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: compliance-risk          # nombre del service (DNS interno del cluster)
+  labels:
+    app: compliance-risk
+spec:
+  type: ClusterIP                # accesible dentro del cluster (usaremos port-forward)
+  selector:
+    app: compliance-risk         # envía tráfico a los pods con esta etiqueta
+  ports:
+    - name: http
+      port: 80                   # puerto del Service
+      targetPort: 3000           # puerto del contenedor (donde escucha BentoML)

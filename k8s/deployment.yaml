@@ -1,0 +1,54 @@
+# deployment.yaml
+# ===============
+# Un Deployment de Kubernetes corre y mantiene viva nuestra API del modelo.
+# Si el pod se cae, Kubernetes lo reinicia automáticamente.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compliance-risk          # nombre del deployment
+  labels:
+    app: compliance-risk
+spec:
+  replicas: 1                    # 1 copia del pod (en prod podrían ser varias)
+  selector:
+    matchLabels:
+      app: compliance-risk       # con qué pods se relaciona este deployment
+  template:
+    metadata:
+      labels:
+        app: compliance-risk     # etiqueta del pod (debe coincidir con el selector)
+    spec:
+      containers:
+        - name: compliance-risk
+          image: compliance-risk:latest
+          # IfNotPresent: usa la imagen LOCAL (la que cargamos en kind),
+          # no intenta descargarla de un registro remoto.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000   # BentoML escucha en 3000 dentro del contenedor
+
+          # --- Health checks: Kubernetes vigila que el modelo esté sano ---
+          # readinessProbe: ¿está listo para recibir tráfico?
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 10   # espera 10s antes de empezar a chequear
+            periodSeconds: 5
+          # livenessProbe: ¿sigue vivo? Si falla, K8s reinicia el pod.
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+          # --- Límites de recursos (buena práctica SRE) ---
+          resources:
+            requests:              # lo mínimo garantizado
+              cpu: "100m"
+              memory: "256Mi"
+            limits:                # el tope que puede usar
+              cpu: "500m"
+              memory: "512Mi"

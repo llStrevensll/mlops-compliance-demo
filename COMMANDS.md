@@ -78,6 +78,51 @@ curl -X POST http://localhost:7777/predict \
 | Model source | BentoML model store (`compliance_risk:latest`), imported from MLflow. |
 | Interactive docs | Open <http://localhost:7777> for the auto-generated Swagger UI. |
 
+## 5. Containerize the service (Docker)
+
+```bash
+# 5.1 Build the Bento (packages service + model + deps)
+uv run bentoml build
+
+# 5.2 Build a Docker image from the Bento (~few minutes; installs ML libs)
+uv run bentoml containerize compliance_risk_service:latest -t compliance-risk:latest
+```
+
+Output: a Docker image `compliance-risk:latest` (~2 GB, includes Python + ML libraries).
+
+## 6. Deploy on Kubernetes (kind, local)
+
+> ⚠️ All `kubectl` commands use `--context kind-mlops` explicitly to avoid touching any other cluster.
+
+```bash
+# 6.1 Create a local Kubernetes cluster
+kind create cluster --name mlops
+
+# 6.2 Load the local image into the cluster (kind can't see local Docker images otherwise)
+kind load docker-image compliance-risk:latest --name mlops
+
+# 6.3 Deploy (Deployment + Service)
+kubectl --context kind-mlops apply -f k8s/
+
+# 6.4 Wait until the pod is ready
+kubectl --context kind-mlops wait --for=condition=ready pod -l app=compliance-risk --timeout=120s
+
+# 6.5 Expose the service locally and test
+kubectl --context kind-mlops port-forward svc/compliance-risk 7777:80 &
+curl -X POST http://localhost:7777/predict \
+  -H "Content-Type: application/json" \
+  -d '{"finding": {"severity":5,"days_open":120,"control_failures":4,
+       "affected_systems":6,"is_repeat_finding":1,"has_remediation_plan":0,
+       "framework":"SOC2","department":"IT"}}'
+# -> {"risk_high": 1, "risk_label": "HIGH"}
+```
+
+Teardown (free resources):
+
+```bash
+kind delete cluster --name mlops
+```
+
 ## Where things live (summary)
 
 | Path | Content | Versioned in git? |
