@@ -16,6 +16,8 @@ Ver resultados:
     uv run mlflow ui --backend-store-uri sqlite:///mlflow.db  ->  http://localhost:5000
 """
 
+import json                                 # para guardar las métricas en un archivo
+
 import mlflow
 import mlflow.sklearn                       # flavor para guardar Pipelines de sklearn
 import pandas as pd
@@ -158,10 +160,16 @@ def main() -> None:
             registered_model_name=NOMBRE_MODELO_REGISTRO,
         )
 
+        # Guardamos las métricas en un archivo JSON. El quality gate del CI/CD
+        # (src/check_quality.py) lo leerá para decidir si el modelo pasa o no.
+        with open("metrics.json", "w") as f:
+            json.dump(metricas, f, indent=2)
+
         print("\n=== Métricas del modelo ===")
         for nombre, valor in metricas.items():
             print(f"  {nombre:10s}: {valor:.4f}")
         print(f"\nModelo registrado como: '{NOMBRE_MODELO_REGISTRO}'")
+        print("Métricas guardadas en: metrics.json")
 
 
 if __name__ == "__main__":

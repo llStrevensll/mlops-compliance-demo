@@ -1,0 +1,52 @@
+# ml-pipeline.yml
+# ===============
+# Pipeline de CI/CD para ML. Se ejecuta en los servidores de GitHub.
+# En cada push/PR: instala deps -> genera datos -> entrena -> evalúa (quality gate).
+# Si el modelo no cumple los umbrales, el job FALLA (modelo malo bloqueado).
+
+name: ML Pipeline
+
+# Cuándo se dispara el workflow
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:   # permite ejecutarlo manualmente desde la pestaña Actions
+
+jobs:
+  train-and-validate:
+    runs-on: ubuntu-latest   # máquina virtual de GitHub
+
+    steps:
+      # 1) Descargar el código del repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2) Instalar uv (nuestro gestor de paquetes)
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      # 3) Instalar las dependencias exactas del proyecto (desde uv.lock)
+      - name: Install dependencies
+        run: uv sync
+
+      # 4) Generar el dataset sintético (reproducible con seed)
+      - name: Generate dataset
+        run: uv run python src/generate_data.py
+
+      # 5) Entrenar el modelo (registra en MLflow local + guarda metrics.json)
+      - name: Train model
+        run: uv run python src/train.py
+
+      # 6) Quality gate: falla el build si las métricas no cumplen el umbral
+      - name: Quality gate
+        run: uv run python src/check_quality.py
+
+      # 7) Guardar metrics.json como artefacto descargable del run (evidencia)
+      - name: Upload metrics
+        if: always()        # súbelo aunque el gate falle, para poder revisar
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-metrics
+          path: metrics.json

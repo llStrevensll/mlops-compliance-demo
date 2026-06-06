@@ -35,6 +35,9 @@ mlartifacts/
 *.bin
 models/
 
+# --- Métricas generadas por el entrenamiento (artefacto del CI) ---
+metrics.json
+
 # --- Datos (no subimos datasets) ---
 data/*.csv
 data/*.parquet
