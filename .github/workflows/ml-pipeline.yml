@@ -21,11 +21,11 @@ jobs:
     steps:
       # 1) Descargar el código del repo
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2) Instalar uv (nuestro gestor de paquetes)
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       # 3) Instalar las dependencias exactas del proyecto (desde uv.lock)
       - name: Install dependencies
