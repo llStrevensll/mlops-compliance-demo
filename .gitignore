@@ -47,6 +47,17 @@ data/*.parquet
 # Excepción: sí conservamos la carpeta vacía con su .gitkeep
 !data/.gitkeep
 
+# --- Terraform (state, locks, vars sensibles, artefactos) ---
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+# tfvars reales (contienen perfil/account id) -> nunca al repo. Sí versionamos el .example
+terraform.tfvars
+# artefacto del modelo para SageMaker (generado por package_sagemaker.py)
+terraform/sagemaker/model.tar.gz
+terraform/sagemaker/build/
+
 # --- Sistema operativo / editor ---
 .DS_Store
 .idea/

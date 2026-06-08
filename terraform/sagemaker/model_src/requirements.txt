@@ -1,0 +1,5 @@
+# El contenedor sklearn de AWS trae una versión vieja de scikit-learn.
+# Nuestro modelo se entrenó con versiones nuevas, así que las instalamos al
+# arrancar el contenedor para que pueda "des-serializar" el Pipeline sin errores.
+scikit-learn==1.8.0
+xgboost==3.2.0

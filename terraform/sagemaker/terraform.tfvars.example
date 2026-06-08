@@ -1,0 +1,8 @@
+# terraform.tfvars.example
+# ========================
+# Copia este archivo a 'terraform.tfvars' y pon tus valores reales.
+# terraform.tfvars está en .gitignore -> NUNCA se sube al repo público.
+
+aws_profile        = "YOUR_SSO_PROFILE"      # ej: el perfil SSO de tu sandbox
+sandbox_account_id = "YOUR_SANDBOX_ACCOUNT"  # el account id permitido (guard de seguridad)
+region             = "us-east-1"
